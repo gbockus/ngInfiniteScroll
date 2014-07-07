@@ -221,6 +221,71 @@ describe 'Infinite Scroll', ->
       el.remove()
       scope.$destroy()
 
+    'alternate trigger change results in scrolling': (scroller, container, injScope) ->
+      el = angular.element(scroller)
+      $document.append(el)
+
+      isWindow = true unless container?
+      if not isWindow
+        container.height 1000
+        container.scrollTop = 3999
+      else
+        sinon.stub(fakeWindow, 'height').returns(1000)
+        sinon.stub(fakeWindow, 'scrollTop').returns(3998)
+        container = fakeWindow
+
+      scope = $rootScope.$new(true)
+      for k, v of injScope
+        scope[k] = v
+      scope.scrollIt = false;
+      scope.scroll = sinon.spy()
+      $compile(el)(scope)
+      scope.$digest()
+      container.scroll()
+      scope.scroll.should.not.have.been.called
+
+      # alternate trigger change should result in a scroll call
+      scope.scrollIt = true
+      scope.$apply()
+      scope.scroll.should.have.been.calledOnce
+      scope.scrollIt.should.equal(false);
+
+      # scrolling the container will not result in a scroll call
+      container.scroll()
+      scope.scroll.callCount.should.equal(1)
+
+      el.remove()
+      scope.$destroy()
+
+    'alternate trigger functions with infinite-scroll-immediate-check true': (scroller, container, injScope) ->
+      el = angular.element(scroller)
+      $document.append(el)
+
+      isWindow = true unless container?
+      if not isWindow
+        container.height(1000)
+      else
+        sinon.stub(fakeWindow, 'height').returns(1000)
+        container = fakeWindow
+
+      scope = $rootScope.$new(true)
+      for k, v of injScope
+        scope[k] = v
+      scope.scrollIt = false
+      scope.scroll = sinon.spy()
+      $compile(el)(scope)
+      $timeout.flush() # 'immediate' call is with $timeout ..., 0
+
+      scope.scroll.should.have.been.called
+
+      scope.scrollIt = true
+      scope.$apply()
+      scope.scroll.should.have.been.calledTwice
+      scope.scrollIt.should.equal(false);
+
+      el.remove()
+      scope.$destroy()
+
   scrollers =
     'triggers on scrolling': ->
       """
@@ -255,7 +320,19 @@ describe 'Infinite Scroll', ->
     'respects the infinite-scroll-distance attribute': -> 
       """
       <div infinite-scroll='scroll()' infinite-scroll-distance='5' style='height: 10000px;'></div>
-      """ 
+      """
+
+    'alternate trigger change results in scrolling': ->
+      """
+      <div infinite-scroll='scroll()' infinite-scroll-alternate-trigger="scrollIt"
+        infinite-scroll-immediate-check='false'></div>
+      """
+
+    'alternate trigger functions with infinite-scroll-immediate-check true': ->
+      """
+      <div infinite-scroll='scroll()' infinite-scroll-alternate-trigger="scrollIt"
+        infinite-scroll-immediate-check='true'></div>
+      """
 
   for test, scroller of scrollers
     ((scroller, test) ->
